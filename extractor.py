@@ -1,30 +1,13 @@
 from re import sub
 import collections
 import spacy
+import pandas as pd
 
 nlp = spacy.load("en_core_web_sm")
 nlp.add_pipe("merge_noun_chunks")
 
-text = "Cognitive science is the study of the human mind and brain, focusing on how the mind represents and manipulates knowledge and how mental representations and processes are realized in the brain."
-
-doc = nlp(text)
-
-def camel_case(s):
-    s = sub(r"(_|-)+", " ", s).title().replace(" ", "")
-    return ''.join([s[0].lower(), s[1:]])
-
-def dictToFactPl(knowledgeBaseFile, dic):
-    file = open(knowledgeBaseFile, "a")
-    for pred, arg in dic.items():
-        print(pred)
-        predCamelCase = camel_case(pred)
-        fact = predCamelCase + f"{arg}" + "." + "\n"
-        file.writelines(fact)
-
-        return fact
-    file.close()
-
 def mergeTokensUponSideRelativity(tokenCompound: list, tokenComplement: list) -> list:
+    """The function merges input tokens in respect to their position in a sentence"""
     mergedTokenList = tokenCompound + tokenComplement
     mergedTokenIndexDict = {}
 
@@ -36,7 +19,7 @@ def mergeTokensUponSideRelativity(tokenCompound: list, tokenComplement: list) ->
     return list(orderdDict.values())
 
 def demlimiter(seq: list) -> dict:
-    # function that creates dict using delimiter as key and its set as value
+    """The function creates dict object using delimiter as key and its set as value"""
     result_dict = {}
     l = []
     for token in seq:
@@ -53,6 +36,7 @@ def demlimiter(seq: list) -> dict:
     return result_dict
 
 def getVerbConj(verb) -> tuple:
+    """The function gets verbs' conjuctions"""
     # Condition - verb has conjuctions
     allConjCompl = []
     allConjs = []
@@ -73,6 +57,7 @@ def getVerbConj(verb) -> tuple:
     return allConjs, allConjCompl
 
 def getVerbComplementation(verb) -> list:
+    """The function extracts verb and all other words that complement it"""
     verbComplement = [verb]
     for verbChild in verb.children:
         if verbChild.dep_ in ("neg", "aux", "auxpass", "advmod", "attr", "prt"):
@@ -87,6 +72,7 @@ def getVerbComplementation(verb) -> list:
     return verbComplement
 
 def getVerbObject(verb) -> list:
+    """The function gets the objects to which the verb refers"""
 
     verbObjects = []
     for verbChild in verb.children:
@@ -109,6 +95,7 @@ def getVerbObject(verb) -> list:
     return verbObjects
 
 def getSPO(subject) -> dict:
+    """The function gets relations subject-predicate-object upon subject as input"""
     spo = {}
 
     subjectList = [token.lemma_.lower() for token in list(subject.subtree)]
@@ -129,10 +116,11 @@ def getSPO(subject) -> dict:
 
     return spo
 
-def getSPODependecy(text) -> list:
+def getSPODependecy(doc) -> list:
+    """The function gets all SPO relations from the input text"""
     SPOlist = []
     # TODO: first conduct coreference resolution on whole doc
-    for sent in text.sents:
+    for sent in doc.sents:
         for token in sent:
             # token is subject
             if token.dep_ == "nsubj" or token.dep_ == "nsubjpass":
@@ -140,6 +128,21 @@ def getSPODependecy(text) -> list:
 
     return SPOlist
 
-print("List of facts:", getSPODependecy(doc))
-print(f"Number of facts: {len(getSPODependecy(doc))}")
+def facts_to_df(doc):
 
+  listOfFacts = getSPODependecy(doc)
+
+  s = []
+  p = []
+  o = []
+  import pandas as pd
+  for fact in listOfFacts:
+      for k, v in fact.items():
+          for obj in v[1]:
+              s.append(v[0])
+              p.append(k)
+              o.append(obj)
+
+  # table Facts
+  df = pd.DataFrame({"subject":s, "predicate":p, "object":o})
+  return df
